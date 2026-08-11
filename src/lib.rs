@@ -16,7 +16,9 @@ pub fn query_fn(
         let FnArg::Typed(PatType { ty, .. }) = arg else {
             continue;
         };
-        structs.extend(get_query_data(&name, ty));
+        if let Some(vec) = get_query_data(&name, ty) {
+            structs.extend(vec);
+        }
     }
     let tokens = quote! {
         #input
@@ -24,7 +26,7 @@ pub fn query_fn(
     };
     tokens.into()
 }
-fn get_query_data(name: &str, t: &mut Type) -> Option<TokenStream> {
+fn get_query_data(name: &str, t: &mut Type) -> Option<Vec<TokenStream>> {
     let Type::Path(path) = &mut *t else {
         return None;
     };
@@ -38,6 +40,18 @@ fn get_query_data(name: &str, t: &mut Type) -> Option<TokenStream> {
     };
     match last.ident.to_string().as_str() {
         "Option" => get_query_data(name, p),
+        "ParamSet" => {
+            let Type::Tuple(tuple) = &mut *p else {
+                return None;
+            };
+            let mut vec = Vec::new();
+            for t in &mut tuple.elems {
+                if let Some(inner) = get_query_data(name, t) {
+                    vec.extend(inner);
+                }
+            }
+            Some(vec)
+        }
         "Single" | "Query" => {
             let Type::Tuple(tuple) = &*p else {
                 return None;
@@ -74,7 +88,7 @@ fn get_query_data(name: &str, t: &mut Type) -> Option<TokenStream> {
                     #(#types,)*
                 }
             };
-            Some(tokens)
+            Some(vec![tokens])
         }
         _ => None,
     }
