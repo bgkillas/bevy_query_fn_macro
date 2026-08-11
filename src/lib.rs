@@ -22,7 +22,6 @@ pub fn query_fn(
         #input
         #(#structs)*
     };
-    println!("{}", tokens);
     tokens.into()
 }
 fn get_query_data(name: &str, t: &mut Type) -> Option<TokenStream> {
