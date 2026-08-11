@@ -1,5 +1,5 @@
 use heck::ToSnakeCase;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{
     FnArg, GenericArgument, ItemFn, Lifetime, PatType, PathArguments, Type, parse_macro_input,
@@ -10,7 +10,7 @@ pub fn query_fn(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let mut input = parse_macro_input!(input as ItemFn);
-    let name = input.sig.ident.to_string();
+    let name = input.sig.ident.clone();
     let mut structs = Vec::new();
     for (i, arg) in input.sig.inputs.iter_mut().enumerate() {
         let FnArg::Typed(PatType { ty, .. }) = arg else {
@@ -26,7 +26,7 @@ pub fn query_fn(
     };
     tokens.into()
 }
-fn get_query_data(name: &str, i: usize, t: &mut Type) -> Option<Vec<TokenStream>> {
+fn get_query_data(name: &Ident, i: usize, t: &mut Type) -> Option<Vec<TokenStream>> {
     let Type::Path(path) = &mut *t else {
         return None;
     };
@@ -65,12 +65,12 @@ fn get_query_data(name: &str, i: usize, t: &mut Type) -> Option<Vec<TokenStream>
             for e in &tuple.elems {
                 tys.extend(get_type_data(e.clone(), &mut any_mut))
             }
-            let ident = format_ident!("_{name}_{i}");
+            let ident = format_ident!("_{name}_{i}", span = name.span());
             let new_arg = quote! {#ident};
             *p = syn::parse2(new_arg).ok()?;
             let types = tys
                 .into_iter()
-                .map(|Ty { path, name }| (path, format_ident!("{}", name)))
+                .map(|Ty { path, name }| (path, format_ident!("{name}", span = name.span())))
                 .map(|(path, name)| quote! {#name: #path});
             let mut_att = if any_mut {
                 quote! {#[query_data(mutable)]}
@@ -80,6 +80,7 @@ fn get_query_data(name: &str, i: usize, t: &mut Type) -> Option<Vec<TokenStream>
             let tokens = quote! {
                 #[derive(bevy::ecs::query::QueryData)]
                 #mut_att
+                #[allow(nonstandard_style)]
                 pub struct #ident {
                     #(#types,)*
                 }
@@ -101,28 +102,30 @@ fn get_type_data(ty: Type, any_mut: &mut bool) -> Option<Ty> {
             *any_mut |= r.mutability.is_some();
             Some(Ty {
                 path: Type::Reference(r),
-                name,
+                name: Ident::new(&name, Span::call_site()),
             })
         }
-        Type::Path(p) if p.path.segments.last()?.ident == "Option" => {
-            let last = p.path.segments.into_iter().next_back()?;
-            let PathArguments::AngleBracketed(list) = last.arguments else {
+        Type::Path(mut path) if path.path.segments.last()?.ident == "Option" => {
+            let last = path.path.segments.last_mut()?;
+            let PathArguments::AngleBracketed(list) = &mut last.arguments else {
                 return None;
             };
-            let ty = list.args.into_iter().next()?;
-            let GenericArgument::Type(p) = ty else {
+            let ty = list.args.iter_mut().next()?;
+            let GenericArgument::Type(inner) = ty else {
                 return None;
             };
-            let Ty { mut path, name } = get_type_data(p, any_mut)?;
-            let tokens = quote! {Option<#path>};
-            path = syn::parse2(tokens).ok()?;
-            Some(Ty { path, name })
+            let Ty { path: new, name } = get_type_data(inner.clone(), any_mut)?;
+            *inner = new;
+            Some(Ty {
+                path: Type::Path(path),
+                name,
+            })
         }
         Type::Path(p) => {
             let name = to_snake(p.path.segments.last()?.ident.to_string());
             Some(Ty {
                 path: Type::Path(p),
-                name,
+                name: Ident::new(&name, Span::call_site()),
             })
         }
         _ => None,
@@ -133,5 +136,5 @@ fn to_snake(str: String) -> String {
 }
 struct Ty {
     path: Type,
-    name: String,
+    name: Ident,
 }
