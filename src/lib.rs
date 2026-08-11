@@ -93,16 +93,16 @@ fn get_query_data(name: &Ident, i: usize, t: &mut Type) -> Option<Vec<TokenStrea
 fn get_type_data(ty: Type, any_mut: &mut bool) -> Option<Ty> {
     match ty {
         Type::Reference(mut r) => {
-            let name = if let Type::Path(p) = &*r.elem {
-                to_snake(p.path.segments.last()?.ident.to_string())
-            } else {
+            let Type::Path(p) = &*r.elem else {
                 return None;
             };
+            let original = &p.path.segments.last()?.ident.clone();
+            let name = to_snake(original.to_string());
             r.lifetime = Some(Lifetime::new("'static", Span::call_site()));
             *any_mut |= r.mutability.is_some();
             Some(Ty {
                 path: Type::Reference(r),
-                name: Ident::new(&name, Span::call_site()),
+                name: Ident::new(&name, original.span()),
             })
         }
         Type::Path(mut path) if path.path.segments.last()?.ident == "Option" => {
@@ -122,10 +122,11 @@ fn get_type_data(ty: Type, any_mut: &mut bool) -> Option<Ty> {
             })
         }
         Type::Path(p) => {
-            let name = to_snake(p.path.segments.last()?.ident.to_string());
+            let original = &p.path.segments.last()?.ident.clone();
+            let name = to_snake(original.to_string());
             Some(Ty {
                 path: Type::Path(p),
-                name: Ident::new(&name, Span::call_site()),
+                name: Ident::new(&name, original.span()),
             })
         }
         _ => None,
