@@ -12,11 +12,11 @@ pub fn query_fn(
     let mut input = parse_macro_input!(input as ItemFn);
     let name = input.sig.ident.to_string();
     let mut structs = Vec::new();
-    for arg in input.sig.inputs.iter_mut() {
+    for (i, arg) in input.sig.inputs.iter_mut().enumerate() {
         let FnArg::Typed(PatType { ty, .. }) = arg else {
             continue;
         };
-        if let Some(vec) = get_query_data(&name, ty) {
+        if let Some(vec) = get_query_data(&name, i, ty) {
             structs.extend(vec);
         }
     }
@@ -26,7 +26,7 @@ pub fn query_fn(
     };
     tokens.into()
 }
-fn get_query_data(name: &str, t: &mut Type) -> Option<Vec<TokenStream>> {
+fn get_query_data(name: &str, i: usize, t: &mut Type) -> Option<Vec<TokenStream>> {
     let Type::Path(path) = &mut *t else {
         return None;
     };
@@ -38,15 +38,16 @@ fn get_query_data(name: &str, t: &mut Type) -> Option<Vec<TokenStream>> {
     let GenericArgument::Type(p) = ty else {
         return None;
     };
-    match last.ident.to_string().as_str() {
-        "Option" => get_query_data(name, p),
+    let ident = last.ident.to_string();
+    match ident.as_str() {
+        "Option" => get_query_data(name, i, p),
         "ParamSet" => {
             let Type::Tuple(tuple) = &mut *p else {
                 return None;
             };
             let mut vec = Vec::new();
             for t in &mut tuple.elems {
-                if let Some(inner) = get_query_data(name, t) {
+                if let Some(inner) = get_query_data(name, i, t) {
                     vec.extend(inner);
                 }
             }
@@ -64,12 +65,7 @@ fn get_query_data(name: &str, t: &mut Type) -> Option<Vec<TokenStream>> {
             for e in &tuple.elems {
                 tys.extend(get_type_data(e.clone(), &mut any_mut))
             }
-            let ty_ident = tys
-                .iter()
-                .map(|t| t.name.clone())
-                .collect::<Vec<String>>()
-                .join("_");
-            let ident = format_ident!("_{name}_{}", ty_ident);
+            let ident = format_ident!("_{name}_{i}");
             let new_arg = quote! {#ident};
             *p = syn::parse2(new_arg).ok()?;
             let types = tys

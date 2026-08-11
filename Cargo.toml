@@ -1,5 +1,5 @@
 [package]
-name = "bevy_query_macro"
+name = "bevy_query_fn_macro"
 version = "0.1.0"
 authors = ["bgkillas <walhelm@proton.me>"]
 keywords = ["template", "proc_macro", "procmacro"]
