@@ -19,6 +19,7 @@ pub fn query_fn(
         structs.extend(get_query_data(&name, ty));
     }
     let tokens = quote! {
+        #[allow(private_interfaces)]
         #input
         #(#structs)*
     };
