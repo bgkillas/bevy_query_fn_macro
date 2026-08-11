@@ -1,3 +1,4 @@
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
@@ -102,7 +103,7 @@ fn get_query_data(name: &str, t: &mut Type) -> Option<TokenStream> {
     }
 }
 fn to_snake(str: String) -> String {
-    str
+    str.to_snake_case()
 }
 struct Ty {
     path: TypePath,
