@@ -19,7 +19,6 @@ pub fn query_fn(
         structs.extend(get_query_data(&name, ty));
     }
     let tokens = quote! {
-        #[allow(private_interfaces)]
         #input
         #(#structs)*
     };
@@ -71,7 +70,7 @@ fn get_query_data(name: &str, t: &mut Type) -> Option<TokenStream> {
             let tokens = quote! {
                 #[derive(bevy::ecs::query::QueryData)]
                 #mut_att
-                struct #ident {
+                pub struct #ident {
                     #(#types,)*
                 }
             };
