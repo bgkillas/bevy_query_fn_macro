@@ -73,9 +73,9 @@ fn get_query_data(name: &Ident, i: usize, t: &mut Type) -> Option<Vec<TokenStrea
                 .map(|Ty { path, name }| (path, format_ident!("{name}", span = name.span())))
                 .map(|(path, name)| quote! {#name: #path});
             let mut_att = if any_mut {
-                quote! {#[query_data(mutable)]}
+                quote! {#[query_data(mutable, contiguous(all))]}
             } else {
-                quote! {}
+                quote! {#[query_data(contiguous(all))]}
             };
             let tokens = quote! {
                 #[derive(bevy::ecs::query::QueryData)]
